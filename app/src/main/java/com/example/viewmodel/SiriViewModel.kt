@@ -1084,6 +1084,61 @@ Analyze command: "$command"
             }
         }
 
+        // --- INSTAGRAM AUTO SCROLLER COMMANDS ---
+        if (lowerText.contains("auto scroll") || lowerText.contains("autoscroll") || lowerText.contains("reel change") || lowerText.contains("change karo") || lowerText.contains("scroller")) {
+            if (!SiriAccessibilityService.isRunning) {
+                val responseMsg = "Auto Scroll ke liye Siri Accessibility Service offline hai. Settings se isse bind karein."
+                recordAndSpeakLocalResult(command, "AUTO_SCROLL", "Accessibility service is offline", false, responseMsg)
+                return true
+            }
+
+            // D. Stop auto scroll
+            if (lowerText.contains("stop") || lowerText.contains("band") || lowerText.contains("khatam")) {
+                com.example.service.SiriAutoScrollController.stop()
+                val responseMsg = "Ji Sir, Instagram auto scroll stop kar diya hai."
+                recordAndSpeakLocalResult(command, "AUTO_SCROLL", "Stop auto scroll", true, responseMsg)
+                return true
+            }
+
+            // E. Pause auto scroll
+            if (lowerText.contains("pause") || lowerText.contains("ruk") || lowerText.contains("roko")) {
+                com.example.service.SiriAutoScrollController.pause()
+                val responseMsg = "Ji Sir, auto scroll pause kar diya hai."
+                recordAndSpeakLocalResult(command, "AUTO_SCROLL", "Pause auto scroll", true, responseMsg)
+                return true
+            }
+
+            // F. Resume auto scroll
+            if (lowerText.contains("resume") || lowerText.contains("chalao") || lowerText.contains("shuru")) {
+                com.example.service.SiriAutoScrollController.resume()
+                val responseMsg = "Ji Sir, auto scroll resume kar diya hai."
+                recordAndSpeakLocalResult(command, "AUTO_SCROLL", "Resume auto scroll", true, responseMsg)
+                return true
+            }
+
+            // G. Start/configure auto scroll
+            if (lowerText.contains("start") || lowerText.contains("chalu") || lowerText.contains("karo") || lowerText.contains("second") || lowerText.contains("sec")) {
+                var duration = 15 // Default
+                val regex = "(\\d+)\\s*(second|sec|s)".toRegex()
+                val match = regex.find(lowerText)
+                if (match != null) {
+                    val secStr = match.groupValues[1]
+                    duration = secStr.toIntOrNull() ?: 15
+                } else {
+                    val numRegex = "(\\d+)".toRegex()
+                    val numMatch = numRegex.find(lowerText)
+                    if (numMatch != null) {
+                        duration = numMatch.groupValues[1].toIntOrNull() ?: 15
+                    }
+                }
+
+                com.example.service.SiriAutoScrollController.start(duration)
+                val responseMsg = "Ji Sir, Instagram auto scroll start kar raha hoon. Har $duration second par reel change hogi."
+                recordAndSpeakLocalResult(command, "AUTO_SCROLL", "Start auto scroll with duration $duration s", true, responseMsg)
+                return true
+            }
+        }
+
         // 3. Scroll simulation
         if (lowerText.contains("scroll") || lowerText.contains("niche") || lowerText.contains("upar") || lowerText.contains("down") || lowerText.contains("up")) {
             if (!SiriAccessibilityService.isRunning) {

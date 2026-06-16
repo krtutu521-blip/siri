@@ -355,6 +355,7 @@ fun SiriDashboardScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -365,6 +366,14 @@ fun SiriDashboardScreen(
                 icon = Icons.Default.Mic,
                 testTag = "tab_core_button",
                 onClick = { currentTab = "home" }
+            )
+            // Smart Auto Scroll Assistant Dashboard Tab
+            CustomTabChip(
+                label = "SCROLLER",
+                active = currentTab == "scroller",
+                icon = Icons.Default.Refresh,
+                testTag = "tab_scroller_button",
+                onClick = { currentTab = "scroller" }
             )
             // Automations Info / Commands Tab
             CustomTabChip(
@@ -474,6 +483,17 @@ fun SiriDashboardScreen(
                     )
                     "health" -> HealthDashboardPanel(
                         viewModel = viewModel
+                    )
+                    "scroller" -> AutoScrollDashboardPanel(
+                        accessibilityEnabled = accessibilityActive,
+                        onOpenAccessibility = {
+                            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                            try {
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Could not open settings, please open manually.", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     )
                 }
             }
@@ -1749,6 +1769,380 @@ data class CommandGroup(
     val name: String,
     val commands: List<String>
 )
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun AutoScrollDashboardPanel(
+    accessibilityEnabled: Boolean,
+    onOpenAccessibility: () -> Unit
+) {
+    val isActive by com.example.service.SiriAutoScrollController.isActive.collectAsState()
+    val scrollState by com.example.service.SiriAutoScrollController.scrollState.collectAsState()
+    val timerDuration by com.example.service.SiriAutoScrollController.timerDuration.collectAsState()
+    val secondsRemaining by com.example.service.SiriAutoScrollController.secondsRemaining.collectAsState()
+
+    var customTimeInput by remember { mutableStateOf("") }
+    val presetTimes = listOf(5, 10, 15, 20, 25, 30, 45, 60)
+    val chunkedPresets = presetTimes.chunked(4)
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Accessibility Warning Card if offline
+        if (!accessibilityEnabled) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(NeonPink.copy(alpha = 0.1f))
+                        .border(1.5.dp, NeonPink, RoundedCornerShape(16.dp))
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "ACCESSIBILITY PERMISSION REQUIRED",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Smart Auto Scroller needs Accessibility permissions to execute smooth swipe gestures on Instagram and YouTube Shorts.",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Button(
+                        onClick = onOpenAccessibility,
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonPink),
+                        modifier = Modifier.testTag("scroller_permission_btn")
+                    ) {
+                        Text("Grant Permission", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
+        // Main Timer Ring Card
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFF0F0E2A),
+                                Color(0xFF1B154D)
+                            )
+                        )
+                    )
+                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(24.dp))
+                    .padding(20.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "AUTO SCROLLER CONTROLLER",
+                        color = NeonCyan,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+
+                    // Large Glowing Progress Countdown Indicator
+                    val ringColor = if (scrollState == com.example.service.AutoScrollState.SCROLLING) NeonCyan else NeonPink
+                    val progress = if (timerDuration > 0) secondsRemaining.toFloat() / timerDuration.toFloat() else 1f
+
+                    Box(
+                        modifier = Modifier
+                            .size(140.dp)
+                            .drawBehind {
+                                // Draw glow circle behind
+                                drawCircle(
+                                    color = ringColor.copy(alpha = 0.06f),
+                                    radius = size.width / 2f + 10.dp.toPx()
+                                )
+                                // Draw track
+                                drawCircle(
+                                    color = Color.White.copy(alpha = 0.05f),
+                                    style = Stroke(width = 6.dp.toPx())
+                                )
+                                // Draw progress arc
+                                drawArc(
+                                    color = ringColor,
+                                    startAngle = -90f,
+                                    sweepAngle = 360f * progress,
+                                    useCenter = false,
+                                    style = Stroke(width = 6.dp.toPx())
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = if (scrollState == com.example.service.AutoScrollState.STOPPED) "OFF" else "${secondsRemaining}s",
+                                color = Color.White,
+                                fontSize = 32.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Next Reel",
+                                color = Color.White.copy(alpha = 0.5f),
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+
+                    // Status pill
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(ringColor.copy(alpha = 0.15f))
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = scrollState.name,
+                            color = ringColor,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Buttons Block (Enable, Pause, Resume, Stop)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+                    ) {
+                        if (scrollState == com.example.service.AutoScrollState.STOPPED) {
+                            Button(
+                                onClick = { com.example.service.SiriAutoScrollController.start() },
+                                colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("scroller_start_button")
+                            ) {
+                                Text("Enable Scroller", color = Color.Black, fontWeight = FontWeight.Bold)
+                            }
+                        } else {
+                            if (scrollState == com.example.service.AutoScrollState.SCROLLING) {
+                                Button(
+                                    onClick = { com.example.service.SiriAutoScrollController.pause() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f)),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("scroller_pause_button")
+                                ) {
+                                    Text("Pause", color = Color.White)
+                                }
+                            } else {
+                                Button(
+                                    onClick = { com.example.service.SiriAutoScrollController.resume() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("scroller_resume_button")
+                                ) {
+                                    Text("Resume", color = Color.Black, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            Button(
+                                onClick = { com.example.service.SiriAutoScrollController.stop() },
+                                colors = ButtonDefaults.buttonColors(containerColor = NeonPink),
+                                modifier = Modifier
+                                    .weight(0.8f)
+                                    .testTag("scroller_stop_button")
+                            ) {
+                                Text("Stop", color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Preset Duration Selectors
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.White.copy(alpha = 0.02f))
+                    .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.dp))
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "SELECT AUTO SWIPE INTERVAL",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
+                )
+
+                // Grid of preset timings (4 column design)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    chunkedPresets.forEach { rowItems ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowItems.forEach { seconds ->
+                                val isSelected = timerDuration == seconds && scrollState != com.example.service.AutoScrollState.STOPPED
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(
+                                            if (isSelected) NeonCyan.copy(alpha = 0.15f)
+                                            else Color.White.copy(alpha = 0.04f)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (isSelected) NeonCyan else Color.White.copy(alpha = 0.08f),
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable {
+                                            com.example.service.SiriAutoScrollController.setTimerDuration(seconds)
+                                            if (scrollState != com.example.service.AutoScrollState.STOPPED) {
+                                                com.example.service.SiriAutoScrollController.start(seconds)
+                                            }
+                                        }
+                                        .padding(vertical = 10.dp)
+                                        .testTag("scroller_preset_${seconds}s"),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "${seconds}s",
+                                        color = if (isSelected) NeonCyan else Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Custom Timer Input
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = customTimeInput,
+                        onValueChange = { input ->
+                            if (input.all { it.isDigit() }) {
+                                customTimeInput = input
+                            }
+                        },
+                        label = { Text("Custom Seconds", color = Color.White.copy(alpha = 0.6f)) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = NeonCyan,
+                            unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
+                            cursorColor = NeonCyan
+                        ),
+                        singleLine = true,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("scroller_custom_input")
+                    )
+
+                    Button(
+                        onClick = {
+                            val parsedSecs = customTimeInput.toIntOrNull()
+                            if (parsedSecs != null && parsedSecs > 0) {
+                                com.example.service.SiriAutoScrollController.setTimerDuration(parsedSecs)
+                                if (scrollState != com.example.service.AutoScrollState.STOPPED) {
+                                    com.example.service.SiriAutoScrollController.start(parsedSecs)
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .height(56.dp)
+                            .testTag("scroller_custom_set_btn")
+                    ) {
+                        Text("Set", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        // Info / Guide Card
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.White.copy(alpha = 0.02f))
+                    .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.dp))
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "SUPPORTED APPLICATIONS",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
+                )
+                
+                listOf(
+                    "Instagram Feed & Reels",
+                    "YouTube Shorts (Voice Control)",
+                    "Facebook Feed & Reels"
+                ).forEach { appName ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(NeonCyan)
+                        )
+                        Text(
+                            text = appName,
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                Text(
+                    text = "Privacy Guard: Scroller ceases operations automatically when target application is closed or screen is locked.",
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 10.sp,
+                    lineHeight = 14.sp
+                )
+            }
+        }
+    }
+}
 
 @Composable
 fun HealthDashboardPanel(

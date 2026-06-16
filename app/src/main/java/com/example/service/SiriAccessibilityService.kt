@@ -105,7 +105,14 @@ class SiriAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Listen to events if we want to log what app is in foreground
+        if (event == null) return
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            val packageName = event.packageName?.toString()
+            if (packageName != null) {
+                currentPackage = packageName
+                Log.d("SiriAccessibility", "Current foreground package updated: $packageName")
+            }
+        }
     }
 
     override fun onInterrupt() {
@@ -168,9 +175,32 @@ class SiriAccessibilityService : AccessibilityService() {
 
     companion object {
         private var instance: SiriAccessibilityService? = null
+        var currentPackage: String? = null
 
         val isRunning: Boolean
             get() = instance != null
+
+        /**
+         * Simulates a smooth vertical swipe from bottom to top of the screen to change reels.
+         */
+        fun swipeToNextReel(): Boolean {
+            val service = instance ?: return false
+            val displayMetrics = service.resources.displayMetrics
+            val height = displayMetrics.heightPixels
+            val width = displayMetrics.widthPixels
+            
+            val x = width / 2f
+            val fromY = height * 0.75f
+            val toY = height * 0.25f
+            
+            val path = Path()
+            path.moveTo(x, fromY)
+            path.lineTo(x, toY)
+            
+            val gestureBuilder = GestureDescription.Builder()
+            gestureBuilder.addStroke(GestureDescription.StrokeDescription(path, 0, 350))
+            return service.dispatchGesture(gestureBuilder.build(), null, null)
+        }
 
         /**
          * Simulates typing text into an active input field

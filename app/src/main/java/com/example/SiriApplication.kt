@@ -27,6 +27,7 @@ class SiriApplication : Application() {
         super.onCreate()
         instance = this
         scheduleWatchdog()
+        com.example.service.SiriAutoScrollController.init(this)
     }
 
     private fun scheduleWatchdog() {

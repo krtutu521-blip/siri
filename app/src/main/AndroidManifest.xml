@@ -65,6 +65,12 @@
             android:enabled="true"
             android:exported="false" />
 
+        <!-- Smart Auto Scroll Assistant Floating Controller Service -->
+        <service
+            android:name=".service.SiriAutoScrollFloatingService"
+            android:enabled="true"
+            android:exported="false" />
+
         <!-- Accessibility Automation Service -->
         <service
             android:name=".service.SiriAccessibilityService"
